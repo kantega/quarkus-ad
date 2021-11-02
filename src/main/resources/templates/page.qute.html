@@ -23,7 +23,8 @@
 </head>
 <body>
 <h1>Hello, {identity.principal.name}</h1>
-
-<p>Create your web page using Quarkus RESTEasy & Qute</p>
+<p>
+    Given Name: {identity.principal.getClaim("given_name")}
+</p>
 </body>
 </html>

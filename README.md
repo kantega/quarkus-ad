@@ -152,10 +152,16 @@ application to redirect to a configured list of urls. While there is
 the safest option is to simply redirect the user to an absolute url, and let Quarkus remember where the user wanted
 to go. 
 
+OIDC supports [three different flows](https://www.scottbrady91.com/openid-connect/openid-connect-flows). These
+are called _Authorization Code Flow_, _Implicit Flow_ and _Hybrid Flow_. These are mapped to the application
+types `WEB-APP`, `SERVICE` and `HYBRID` in Quarkus OIDC. The main difference between these flows is whether
+tokens are exposed to the client. In our case, we're developing a server-side rendered web app.
+
 Add the following to `application.properties`:
 
 ```properties
-quarkus.oidc.authentication.redirect-path=/ 
+quarkus.oidc.application-type=web_app
+quarkus.oidc.authentication.redirect-path=/
 quarkus.oidc.authentication.restore-path-after-redirect=true
 ```
 
@@ -274,7 +280,73 @@ Received token:
 }
 ```
 
+## Requesting more information from Active Directory
 
+Looking at the ID token we received above, we can see that the only information we get about the user
+is the email address and a few IDs. Our application can ask for more information from the ID provider 
+(in this case, Azure AD) by modifying the `scope` parameter sent during login.
 
-![img_1.png](img_1.png)
-![img_2.png](img_2.png)
+By default, Quarkus OIDC requests the `openid` scope from AD, but there are 
+[more scopes available](https://auth0.com/docs/configure/apis/scopes/openid-connect-scopes) in all 
+OIDC implementations, and you can add custom scopes in most ID providers. For now, we'll ask for the 
+three standard scopes, `openid`, `profile` and `email`. By asking for `profile`, we'll get 
+basic profile information such as the user's name. 
+
+On the ID provider side of things, we'll need to configure which information to allow 
+the application to ask for. In Azure AD, navigate to `App registrations` > `Quarkus AD` >
+`Token configuration` and click `Add optional claim`. We want to add `email`, `given_name`, 
+and `family name` to the ID token.  
+
+![Add optiona claim](add-optional-claim.png)
+
+You may be asked to turn on the Microsoft Graph permissions. If so, you need to accept. 
+
+![Add Microsoft Graph](add-microsoft-graph.png)
+
+To make Quarkus OIDC ask for the `profile` and `email` scopes, we need to add the following to 
+`application.properties`. Note that the `openid` scope is always requested, so we don't need to 
+specify it explicitly. 
+
+```properties
+quarkus.oidc.authentication.scopes=profile email
+```
+
+Reload http://localhost:8080/some-page, and you should see something resembling this in the logs: 
+
+```json
+Received token:
+{
+  "typ" : "JWT",
+  "alg" : "RS256",
+  "kid" : "l3sQ-50cCH4xBVZLHTGwnSR7680"
+}
+{
+  "aud" : "827523e9-c5f7-410a-a6e7-8db28d7e3647",
+  "iss" : "https://login.microsoftonline.com/22cff3d6-9eda-4664-8d70-c7597cc1b34a/v2.0",
+  "iat" : 1634299970,
+  "nbf" : 1634299970,
+  "exp" : 1634303870,
+  "email" : "ove@nipen.no",
+  "family_name" : "Nipen",
+  "given_name" : "Ove",
+  "idp" : "https://sts.windows.net/9188040d-6c67-4c5b-b112-36a304b66dad/",
+  "name" : "Ove Nipen",
+  "oid" : "97882ea6-d318-4551-b2cc-eda11a176ad1",
+  "preferred_username" : "ove@nipen.no",
+  "rh" : "0.AS8A1vPPItqeZEaNcMdZfMGzSukjdYL3xQpBpueNso1-NkcvAHc.",
+  "sub" : "M-ffvMjipQMfYs6nLepEHPTIlUTTqIkXofB3rTIMpmY",
+  "tid" : "22cff3d6-9eda-4664-8d70-c7597cc1b34a",
+  "uti" : "UuaRzT-VPUyGgNodlWIzAA",
+  "ver" : "2.0"
+}
+```
+
+You can then add some more info to the html page: 
+
+```html 
+<h1>Hello, {identity.principal.name}</h1>
+<p>
+    Given Name: {identity.principal.getClaim("given_name")}
+</p>
+```
+![Claims in HTML](claims-html.png)
