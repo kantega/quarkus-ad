@@ -26,5 +26,16 @@
 <p>
     Given Name: {identity.principal.getClaim("given_name")}
 </p>
+
+<h2>Roles</h2>
+<ul>
+    {#if identity.roles}
+        {#for role in identity.roles}
+            <li>{role}</li>
+        {/for}
+    {#else}
+        <li>No roles found!</li>
+    {/if}
+</ul>
 </body>
 </html>

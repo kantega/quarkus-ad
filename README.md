@@ -4,7 +4,48 @@ In this article we'll demonstrate how to connect your Quarkus application to Mic
 to authenticate and authorize users. We'll show how you can give users access to certain parts of your 
 application by mapping Active Directory groups to application roles.
 
-## Getting started
+## TL;DR
+If you're already familiar with Azure AD and Quarkus OIDC and just want the gist of it, here's what you need to configure.
+Otherwise, read on below for a full tutorial.
+
+In Azure AD, create an "App registration" for your Quarkus app, and create a client secret. Then add one or more app roles,
+and use `Azure AD > Manage > Enterprise applications > Your app > Users and roles > Add user/group` to assign users and/or groups
+to app roles. To return profile information such as Given Name and Family Name as claims, use 
+`Azure AD > Manage > App registrations > Your app > Token configuration` and add claims to the ID token. 
+
+Configure your Quarkus application by adding this to `application.properties`: 
+```properties 
+# Azure AD > Admin > App registrations > Your app > Application (client) ID
+quarkus.oidc.client-id=827523e9-c5f7-410a-a6e7-8db28d7e3647
+
+# Azure AD > Admin > App registrations > Your app > Certificates & secrets > Client secrets > Value
+quarkus.oidc.credentials.secret=<not shown>
+
+# Azure AD > Admin > App registrations > Your app > Directory (tenant) ID
+quarkus.oidc.auth-server-url=https://login.microsoftonline.com/22cff3d6-9eda-4664-8d70-c7597cc1b34a/v2.0
+
+# Regular web app with server side rendering
+quarkus.oidc.application-type=web_app
+
+# Azure AD does not support redirect URIs with wildcards, so we'll use /. Remember to add http://localhost:8080 
+# and the deployed URL of your webapp in Azure AD > Admin > App registrations > Your app > Redirect URIs 
+quarkus.oidc.authentication.redirect-path=/
+quarkus.oidc.authentication.restore-path-after-redirect=true
+
+# Get profile and email info as claims
+quarkus.oidc.authentication.scopes=profile email
+
+# Azure AD stores your app roles in a claim called /roles, not /groups
+quarkus.oidc.roles.role-claim-path=roles
+
+# Increase logging to aid debugging
+quarkus.log.category."io.quarkus.oidc".min-level=TRACE
+quarkus.log.category."io.quarkus.oidc".level=TRACE
+```
+
+This might be enough to get you started. If not, read on!
+
+## The full tutorial
 
 Create a new quarkus application using the code generation tool at 
 [code.quarkus.io](https://code.quarkus.io/?g=no.kantega&a=quarkus-ad&e=resteasy&e=resteasy-qute&e=oidc). Be sure
@@ -350,3 +391,162 @@ You can then add some more info to the html page:
 </p>
 ```
 ![Claims in HTML](claims-html.png)
+
+## Role-Based Access Control
+Now that we know the user's identity, we can decide what they're allowed to do. To set up roles
+for your application, navigate to `Manage > App registrations > Quarkus AD > App roles` and create a new app
+role. 
+
+![Create roles](create-roles.png)
+
+To assign roles to users, navigate to `Manage > Enterprise Applications > Quarkus AD > Users and groups`. 
+Then click `Add user/group`. Select the users you want to assign a role, and select one role to assign. 
+
+![Assign roles](assign-roles.png)
+
+You should see your assigned roles on the `Users and roles` screen afterwards. 
+
+![Assigned roles](assigned-roles.png)
+
+If you log out and log back in, you should see that your token has been updated with the newly assigned roles: 
+
+```json 
+Received token:
+{
+  "typ" : "JWT",
+  "alg" : "RS256",
+  "kid" : "l3sQ-50cCH4xBVZLHTGwnSR7680"
+}
+{
+  "aud" : "827523e9-c5f7-410a-a6e7-8db28d7e3647",
+  "iss" : "https://login.microsoftonline.com/22cff3d6-9eda-4664-8d70-c7597cc1b34a/v2.0",
+  "iat" : 1636023670,
+  "nbf" : 1636023670,
+  "exp" : 1636027570,
+  "email" : "ove@nipen.no",
+  "family_name" : "Nipen",
+  "given_name" : "Ove",
+  "idp" : "https://sts.windows.net/9188040d-6c67-4c5b-b112-36a304b66dad/",
+  "name" : "Ove Nipen",
+  "oid" : "97882ea6-d318-4551-b2cc-eda11a176ad1",
+  "preferred_username" : "ove@nipen.no",
+  "rh" : "0.AS8A1vPPItqeZEaNcMdZfMGzSukjdYL3xQpBpueNso1-NkcvAHc.",
+  "roles" : [ "admin", "users" ],
+  "sub" : "M-ffvMjipQMfYs6nLepEHPTIlUTTqIkXofB3rTIMpmY",
+  "tid" : "22cff3d6-9eda-4664-8d70-c7597cc1b34a",
+  "uti" : "eGIjNwQa4UOP9wU2dUwmAA",
+  "ver" : "2.0"
+}
+```
+
+
+Let's try to display the roles on `page.qute.html`: 
+
+```html
+<body>
+<h1>Hello, {identity.principal.name}</h1>
+<p>
+    Given Name: {identity.principal.getClaim("given_name")}
+</p>
+
+<h2>Roles</h2>
+<ul>
+    {#if identity.roles}
+        {#for role in identity.roles}
+            <li>{role}</li>
+        {/for}
+    {#else}
+        <li>No roles found!</li>
+    {/if}
+</ul>
+</body>
+</html>
+```
+
+Unfortunately, Quarkus cannot see any roles. 
+
+![No roles](no-roles.png)
+
+By default, Quarkus OIDC looks for roles in a claim called `/groups`. As we can see, Azure AD uses a claim called `/roles`.
+This can be configured by setting the following property in `application.properties`:
+
+```properties
+quarkus.oidc.roles.role-claim-path=roles
+```
+
+![Roles](roles.png)
+
+Now that we know the user's identity and their roles, we can finally use it for controlling access to our services. 
+For a simple (but heavy handed) approach, you can annotate a resource with `@RolesAllowed`. Any users not
+in the listed roles will receive a `403 Forbidden` reply. 
+
+Replace the `@Authenticated` annotation in `SomePage.java` with `@RolesAllowed("admin")` and refresh the page. Then 
+experiment with requiring other roles that your user does not have, and you should get a blank page and the HTTP status 403 Forbidden. 
+
+```java
+@Path("/some-page")
+@RolesAllowed("admin")
+public class SomePage {
+    private final Template page;
+
+    @Inject
+    SecurityIdentity identity;
+    
+    ...
+}
+```
+
+For a more refined approach, you can use `identity.hasRole(...)` to display a more user-friendly page if the user
+does not have access. 
+
+`SomePage.java`:
+```java
+@Path("/some-page")
+@Authenticated
+public class SomePage {
+private final Template page;
+private final Template forbidden;
+
+    @Inject
+    SecurityIdentity identity;
+
+    public SomePage(Template page, Template forbidden) {
+        this.page = requireNonNull(page, "page is required");
+        this.forbidden = requireNonNull(forbidden, "page is required");
+    }
+
+    @GET
+    @Produces(MediaType.TEXT_HTML)
+    public TemplateInstance get(@QueryParam("name") String name) {
+        if (identity.hasRole("root")) {
+            return page
+                    .data("name", name)
+                    .data("identity", identity);
+        } else {
+            return forbidden
+                    .data("identity", identity);
+        }
+    }
+}
+```
+
+`src/main/resources/templates/forbidden.qute.html`:
+```html
+<h1>Access denied</h1>
+
+<p>
+    I'm sorry {identity.principal.getClaim("given_name")}, but you do not have access to this page.
+</p>
+```
+
+Then reload the page, and you should see something similar to this: 
+
+![Forbidden](forbidden.png)
+
+
+# Further reading
+We've shown how to configure Azure AD and Quarkus OIDC to enable Role-based Access Control in your Quarkus apps. 
+For more information about securing your Quarkus app, check out https://quarkus.io/guides/#security
+
+Happy hacking!
+

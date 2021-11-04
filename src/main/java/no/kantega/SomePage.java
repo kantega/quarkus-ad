@@ -18,19 +18,26 @@ import static java.util.Objects.requireNonNull;
 @Authenticated
 public class SomePage {
     private final Template page;
+    private final Template forbidden;
 
     @Inject
     SecurityIdentity identity;
 
-    public SomePage(Template page) {
+    public SomePage(Template page, Template forbidden) {
         this.page = requireNonNull(page, "page is required");
+        this.forbidden = requireNonNull(forbidden, "page is required");
     }
 
     @GET
     @Produces(MediaType.TEXT_HTML)
     public TemplateInstance get(@QueryParam("name") String name) {
-        return page
-                .data("name", name)
-                .data("identity", identity);
+        if (identity.hasRole("root")) {
+            return page
+                    .data("name", name)
+                    .data("identity", identity);
+        } else {
+            return forbidden
+                    .data("identity", identity);
+        }
     }
 }
