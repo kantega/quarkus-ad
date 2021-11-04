@@ -88,7 +88,7 @@ public class SomePage {
 
 Open http://localhost:8080/some-page and you should see the following page: 
 
-![Hello Qute](hello-qute.png)
+![Hello Qute](doc/hello-qute.png)
 
 ## Authentication with OpenID Connect and Azure Active Directory
 
@@ -101,7 +101,7 @@ to configuring.
 After logging in, navigate to the Azure Active Directory control panel using the menu in the top-left corner.
 It should look something like this: 
 
-![Active Directory Front Page](active-directory-front-page.png)
+![Active Directory Front Page](doc/active-directory-front-page.png)
 
 Quarkus needs three parameters to integrate with Active Directory. These are: 
 
@@ -114,7 +114,7 @@ quarkus.oidc.auth-server-url
 To create the values for these parameters, we first need to register our application with Azure AD. Navigate to 
 `Manage/App registrations` in the menu on the left. 
 
-![App registrations](app-registrations-empty.png)
+![App registrations](doc/app-registrations-empty.png)
 
 Select `New registration`, and fill inn the form. Use `Quarkus AD` as the application name. We'll also allow
 users from any organizational directory to log in. 
@@ -125,16 +125,16 @@ afterwards. Azure AD will not allow any redirect URLs that are not registered. W
 application to another server (not localhost), you will need to add that URL as well. We'll come back to this
 later. For now, we'll stick with http://localhost:8080, since this will allow us to test the login flow. 
 
-![New app registration](new-app-registration.png)
+![New app registration](doc/new-app-registration.png)
 
 Click register. You should now be able to find the app registration by navigating to `Manage/App registrations`
 in the menu on the left. 
 
-![App registrations](app-registrations.png)
+![App registrations](doc/app-registrations.png)
 
 We can now find the parameters we need to set up Quarkus OIDC. Click on `Quarkus AD` to display its details: 
 
-![Quarkus AD App registration](app-registration-quarkus-ad.png)
+![Quarkus AD App registration](doc/app-registration-quarkus-ad.png)
 
 The first value we're looking for is the Application (client) ID. In our case, the value is 
 `827523e9-c5f7-410a-a6e7-8db28d7e3647`. Yours will be different. 
@@ -150,11 +150,11 @@ quarkus.oidc.auth-server-url=<todo>
 
 Next, click `Add a certificate or secret`, and then `New client secret`. Name it `Quarkus AD client secret` and click `Add`. 
 
-![Add client secret](add-client-secret.png)
+![Add client secret](doc/add-client-secret.png)
 
 You should then see it in the list of client secrets: 
 
-![New client secret](new-client-secret.png)
+![New client secret](doc/new-client-secret.png)
 
 Copy the value (not the ID) to the clipboard using the small copy-button and set `quarkus.oidc.credentials.secret`
 to that value. 
@@ -169,7 +169,7 @@ The last property we need is the Auth Server URL. You'll find that by navigating
 and selecting `Endpoints`. The value we need is "OpenID Connect Metadata document", but only the part 
 up to and including `v2.0`. Quarkus will add `.well-known`, etc, itself. 
 
-![Endpoints](endpoints.png)
+![Endpoints](doc/endpoints.png)
 
 Copy the value and set `quarkus.oidc.auth-server-url` in application.properties:
 
@@ -243,11 +243,11 @@ You can then modify the html template to display the name of the user. In `page.
 Finally, test it out by navigating to http://localhost:8080/some-page. You should be redirected to Azure AD and
 asked to log on. You may also be asked to consent to sharing your data with the application.  
 
-![AD Consent dialog](consent.png)
+![AD Consent dialog](doc/consent.png)
 
 If all went well, you should see this page:
 
-![Hello, user!](hello-user.png)
+![Hello, user!](doc/hello-user.png)
 
 ## Debugging Quarkus OIDC
 
@@ -338,11 +338,11 @@ the application to ask for. In Azure AD, navigate to `App registrations` > `Quar
 `Token configuration` and click `Add optional claim`. We want to add `email`, `given_name`, 
 and `family name` to the ID token.  
 
-![Add optiona claim](add-optional-claim.png)
+![Add optiona claim](doc/add-optional-claim.png)
 
 You may be asked to turn on the Microsoft Graph permissions. If so, you need to accept. 
 
-![Add Microsoft Graph](add-microsoft-graph.png)
+![Add Microsoft Graph](doc/add-microsoft-graph.png)
 
 To make Quarkus OIDC ask for the `profile` and `email` scopes, we need to add the following to 
 `application.properties`. Note that the `openid` scope is always requested, so we don't need to 
@@ -390,23 +390,23 @@ You can then add some more info to the html page:
     Given Name: {identity.principal.getClaim("given_name")}
 </p>
 ```
-![Claims in HTML](claims-html.png)
+![Claims in HTML](doc/claims-html.png)
 
 ## Role-Based Access Control
 Now that we know the user's identity, we can decide what they're allowed to do. To set up roles
 for your application, navigate to `Manage > App registrations > Quarkus AD > App roles` and create a new app
 role. 
 
-![Create roles](create-roles.png)
+![Create roles](doc/create-roles.png)
 
 To assign roles to users, navigate to `Manage > Enterprise Applications > Quarkus AD > Users and groups`. 
 Then click `Add user/group`. Select the users you want to assign a role, and select one role to assign. 
 
-![Assign roles](assign-roles.png)
+![Assign roles](doc/assign-roles.png)
 
 You should see your assigned roles on the `Users and roles` screen afterwards. 
 
-![Assigned roles](assigned-roles.png)
+![Assigned roles](doc/assigned-roles.png)
 
 If you log out and log back in, you should see that your token has been updated with the newly assigned roles: 
 
@@ -465,7 +465,7 @@ Let's try to display the roles on `page.qute.html`:
 
 Unfortunately, Quarkus cannot see any roles. 
 
-![No roles](no-roles.png)
+![No roles](doc/no-roles.png)
 
 By default, Quarkus OIDC looks for roles in a claim called `/groups`. As we can see, Azure AD uses a claim called `/roles`.
 This can be configured by setting the following property in `application.properties`:
@@ -474,7 +474,7 @@ This can be configured by setting the following property in `application.propert
 quarkus.oidc.roles.role-claim-path=roles
 ```
 
-![Roles](roles.png)
+![Roles](doc/roles.png)
 
 Now that we know the user's identity and their roles, we can finally use it for controlling access to our services. 
 For a simple (but heavy handed) approach, you can annotate a resource with `@RolesAllowed`. Any users not
@@ -541,7 +541,7 @@ private final Template forbidden;
 
 Then reload the page, and you should see something similar to this: 
 
-![Forbidden](forbidden.png)
+![Forbidden](doc/forbidden.png)
 
 
 # Further reading
