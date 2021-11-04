@@ -31,7 +31,7 @@ public class SomePage {
     @GET
     @Produces(MediaType.TEXT_HTML)
     public TemplateInstance get(@QueryParam("name") String name) {
-        if (identity.hasRole("root")) {
+        if (identity.hasRole("admin")) {
             return page
                     .data("name", name)
                     .data("identity", identity);
